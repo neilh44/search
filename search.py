@@ -38,6 +38,10 @@ def search_indexed_data(user_query, indexed_data):
         # Placeholder for embedding creation
         return query
 
+    def ask_chatgpt(knowledge_base, user_query):
+        # Placeholder for chatgpt response
+        return "ChatGPT response based on user query and knowledge base"
+
     embedding = create_embedding(user_query)
     result = query_vector_db(embedding)
 
@@ -48,7 +52,7 @@ def search_indexed_data(user_query, indexed_data):
     knowledge_base = "\n".join(result['list_of_knowledge_base'])
 
     # Ask the user query using chat prompt
-    response = ask_chatgpt(knowledge_base, user_query)  # Placeholder for ask_chatgpt
+    response = ask_chatgpt(knowledge_base, user_query)
 
     return {
         'sources': result['list_of_sources'],
