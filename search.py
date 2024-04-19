@@ -40,7 +40,8 @@ def main():
         if url:
             indexed_data = index_website(url)
             if indexed_data:
-                st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(indexed_data)], ignore_index=True)
+                indexed_df = pd.DataFrame(indexed_data, index=[0])  # Create DataFrame with single row
+                st.session_state.data = pd.concat([st.session_state.data, indexed_df], ignore_index=True)
                 st.success("Website indexed successfully!")
             else:
                 st.error("Failed to index website.")
@@ -52,4 +53,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
