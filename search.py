@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Function to scrape website content
 def scrape_website(url):
@@ -31,7 +33,7 @@ def main():
     st.title("Chat Prompt Search Engine")
 
     # Load or create DataFrame
-    if 'data' not in st.session_state:
+    if 'data.csv' not in st.session_state:
         st.session_state.data = pd.DataFrame(columns=['Title', 'Text'])
 
     # Chat prompt
@@ -40,8 +42,7 @@ def main():
         if url:
             indexed_data = index_website(url)
             if indexed_data:
-                indexed_df = pd.DataFrame(indexed_data, index=[0])  # Create DataFrame with single row
-                st.session_state.data = pd.concat([st.session_state.data, indexed_df], ignore_index=True)
+                st.session_state.data = st.session_state.data.append(indexed_data, ignore_index=True)
                 st.success("Website indexed successfully!")
             else:
                 st.error("Failed to index website.")
