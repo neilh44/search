@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from transformers import pipeline
 
 # Function to scrape website content
 def scrape_website(url):
@@ -23,48 +24,32 @@ def scrape_website(url):
 def index_website(url):
     text = scrape_website(url)
     if text:
-        return {"Title": url, "Text": text}
+        return {"URL": url, "Text": text}
     else:
         return None
 
-# Function to search indexed data
-def search_indexed_data(user_query, indexed_data):
-    # Placeholder function for query_vector_db and create_embedding
-    # Replace this with your actual implementation
-    def query_vector_db(embedding):
-        return {'list_of_sources': ['Source 1', 'Source 2'], 'list_of_knowledge_base': ['Knowledge 1', 'Knowledge 2']}
+# Function to search indexed data and answer questions using LLM
+def search_and_answer(user_query, indexed_data):
+    # Initialize a question answering pipeline with a pre-trained model
+    qa_pipeline = pipeline("question-answering", model="deepset/roberta-base-squad2")
 
-    def create_embedding(query):
-        # Placeholder for embedding creation
-        return query
+    # Retrieve the most relevant URL from indexed data
+    top_url = indexed_data.iloc[0]['URL']  # Assuming the first URL is the most relevant
 
-    def ask_chatgpt(knowledge_base, user_query):
-        # Placeholder for chatgpt response
-        return "ChatGPT response based on user query and knowledge base"
+    # Provide the URL's text as context to the language model along with the user query
+    answer = qa_pipeline({
+        'question': user_query,
+        'context': indexed_data.iloc[0]['Text']
+    })
 
-    embedding = create_embedding(user_query)
-    result = query_vector_db(embedding)
-
-    st.write("Sources:")
-    for source in result['list_of_sources']:
-        st.write(source)
-
-    knowledge_base = "\n".join(result['list_of_knowledge_base'])
-
-    # Ask the user query using chat prompt
-    response = ask_chatgpt(knowledge_base, user_query)
-
-    return {
-        'sources': result['list_of_sources'],
-        'response': response
-    }
+    return answer['answer']
 
 def main():
-    st.title("Chat Prompt Search Engine")
+    st.title("Website Crawling and Question Answering")
 
-    # Load or create DataFrame
-    if 'data' not in st.session_state:
-        st.session_state.data = pd.DataFrame(columns=['Title', 'Text'])
+    # Load or create DataFrame to store indexed data
+    if 'indexed_data' not in st.session_state:
+        st.session_state.indexed_data = pd.DataFrame(columns=['URL', 'Text'])
 
     # Chat prompt to index website
     url = st.text_input("Enter website URL:")
@@ -73,25 +58,22 @@ def main():
             indexed_data = index_website(url)
             if indexed_data:
                 indexed_df = pd.DataFrame(indexed_data, index=[0])  # Create DataFrame with single row
-                st.session_state.data = pd.concat([st.session_state.data, indexed_df], ignore_index=True)
+                st.session_state.indexed_data = pd.concat([st.session_state.indexed_data, indexed_df], ignore_index=True)
                 st.success("Website indexed successfully!")
             else:
                 st.error("Failed to index website.")
 
-    # Chat prompt to search indexed data
-    user_query = st.text_input("Enter your query:")
-    if st.button("Search"):
-        if user_query:
-            search_result = search_indexed_data(user_query, st.session_state.data)
-            st.write("Search Results:")
-            st.write(search_result['sources'])
-            st.write("Response:")
-            st.write(search_result['response'])
+    # Chat prompt to ask questions
+    user_query = st.text_input("Ask a question:")
+    if st.button("Ask"):
+        if user_query and not st.session_state.indexed_data.empty:
+            answer = search_and_answer(user_query, st.session_state.indexed_data)
+            st.write("Answer:", answer)
 
     # Display indexed data
-    if not st.session_state.data.empty:
+    if not st.session_state.indexed_data.empty:
         st.subheader("Indexed Data:")
-        st.write(st.session_state.data)
+        st.write(st.session_state.indexed_data)
 
 if __name__ == "__main__":
     main()
