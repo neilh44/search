@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
 
 # Function to scrape website content
 def scrape_website(url):
@@ -20,62 +19,37 @@ def scrape_website(url):
         st.error(f"An error occurred: {str(e)}")
         return None
 
-# Function to extract links from a page
-def extract_links(url):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            links = []
-            for link in soup.find_all('a'):
-                href = link.get('href')
-                if href and not href.startswith('#'):  # Filter out anchor links
-                    absolute_url = urljoin(url, href)
-                    links.append(absolute_url)
-            return links
-        else:
-            st.error(f"Failed to fetch links from the page. Error code: {response.status_code}")
-            return []
-    except Exception as e:
-        st.error(f"An error occurred while extracting links: {str(e)}")
-        return []
-
-# Function to crawl and index website
-def crawl_and_index_website(url, max_depth=3):
-    indexed_data = {}
-
-    def crawl(url, depth):
-        if depth > max_depth:
-            return
-        if url in indexed_data:
-            return
-        st.write(f"Crawling {url}...")
-        text = scrape_website(url)
-        if text:
-            indexed_data[url] = text
-            links = extract_links(url)
-            for link in links:
-                crawl(link, depth + 1)
-
-    crawl(url, depth=1)
-    return indexed_data
+# Function to index website information
+def index_website(url):
+    text = scrape_website(url)
+    if text:
+        return {"Title": url, "Text": text}
+    else:
+        return None
 
 def main():
-    st.title("Website Content Crawler & Indexer")
+    st.title("Chat Prompt Search Engine")
 
-    # Input URL and max depth
+    # Load or create DataFrame
+    if 'data' not in st.session_state:
+        st.session_state.data = pd.DataFrame(columns=['Title', 'Text'])
+
+    # Chat prompt
     url = st.text_input("Enter website URL:")
-    max_depth = st.slider("Maximum Depth (up to 5)", 1, 5, 3)
-
-    if st.button("Crawl and Index"):
+    if st.button("Index Website"):
         if url:
-            indexed_data = crawl_and_index_website(url, max_depth)
+            indexed_data = index_website(url)
             if indexed_data:
-                df = pd.DataFrame(list(indexed_data.items()), columns=["URL", "Text"])
-                st.write("Indexed data:")
-                st.write(df)
+                indexed_df = pd.DataFrame(indexed_data, index=[0])  # Create DataFrame with single row
+                st.session_state.data = pd.concat([st.session_state.data, indexed_df], ignore_index=True)
+                st.success("Website indexed successfully!")
             else:
-                st.error("Failed to crawl and index the website.")
+                st.error("Failed to index website.")
+
+    # Display indexed data
+    if not st.session_state.data.empty:
+        st.subheader("Indexed Data:")
+        st.write(st.session_state.data)
 
 if __name__ == "__main__":
     main()
