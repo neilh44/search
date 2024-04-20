@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 
 # Function to scrape website content
 def scrape_website(url):
@@ -19,79 +20,63 @@ def scrape_website(url):
         st.error(f"An error occurred: {str(e)}")
         return None
 
-# Function to index website information
-def index_website(url):
-    text = scrape_website(url)
-    if text:
-        return {"Title": url, "Text": text}
-    else:
-        return None
+# Function to extract links from a page
+def extract_links(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            links = []
+            for link in soup.find_all('a'):
+                href = link.get('href')
+                if href and not href.startswith('#'):  # Filter out anchor links
+                    absolute_url = urljoin(url, href)
+                    links.append(absolute_url)
+            return links
+        else:
+            st.error(f"Failed to fetch links from the page. Error code: {response.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"An error occurred while extracting links: {str(e)}")
+        return []
 
-# Function to search indexed data
-def search_indexed_data(user_query, indexed_data):
-    # Placeholder function for query_vector_db and create_embedding
-    # Replace this with your actual implementation
-    def query_vector_db(embedding):
-        return {'list_of_sources': ['Source 1', 'Source 2'], 'list_of_knowledge_base': ['Knowledge 1', 'Knowledge 2']}
+# Function to crawl and index website
+def crawl_and_index_website(url, max_depth=3):
+    indexed_data = {}
 
-    def create_embedding(query):
-        # Placeholder for embedding creation
-        return query
+    def crawl(url, depth):
+        if depth > max_depth:
+            return
+        if url in indexed_data:
+            return
+        st.write(f"Crawling {url}...")
+        text = scrape_website(url)
+        if text:
+            indexed_data[url] = text
+            links = extract_links(url)
+            for link in links:
+                crawl(link, depth + 1)
 
-    def ask_chatgpt(knowledge_base, user_query):
-        # Placeholder for chatgpt response
-        return "ChatGPT response based on user query and knowledge base"
-
-    embedding = create_embedding(user_query)
-    result = query_vector_db(embedding)
-
-    st.write("Sources:")
-    for source in result['list_of_sources']:
-        st.write(source)
-
-    knowledge_base = "\n".join(result['list_of_knowledge_base'])
-
-    # Ask the user query using chat prompt
-    response = ask_chatgpt(knowledge_base, user_query)
-
-    return {
-        'sources': result['list_of_sources'],
-        'response': response
-    }
+    crawl(url, depth=1)
+    return indexed_data
 
 def main():
-    st.title("Chat Prompt Search Engine")
+    st.title("Website Content Crawler & Indexer")
 
-    # Load or create DataFrame
-    if 'data' not in st.session_state:
-        st.session_state.data = pd.DataFrame(columns=['Title', 'Text'])
-
-    # Chat prompt to index website
+    # Input URL and max depth
     url = st.text_input("Enter website URL:")
-    if st.button("Index Website"):
+    max_depth = st.slider("Maximum Depth (up to 5)", 1, 5, 3)
+
+    if st.button("Crawl and Index"):
         if url:
-            indexed_data = index_website(url)
+            indexed_data = crawl_and_index_website(url, max_depth)
             if indexed_data:
-                indexed_df = pd.DataFrame(indexed_data, index=[0])  # Create DataFrame with single row
-                st.session_state.data = pd.concat([st.session_state.data, indexed_df], ignore_index=True)
-                st.success("Website indexed successfully!")
+                df = pd.DataFrame(list(indexed_data.items()), columns=["URL", "Text"])
+                st.write("Indexed data:")
+                st.write(df)
             else:
-                st.error("Failed to index website.")
-
-    # Chat prompt to search indexed data
-    user_query = st.text_input("Enter your query:")
-    if st.button("Search"):
-        if user_query:
-            search_result = search_indexed_data(user_query, st.session_state.data)
-            st.write("Search Results:")
-            st.write(search_result['sources'])
-            st.write("Response:")
-            st.write(search_result['response'])
-
-    # Display indexed data
-    if not st.session_state.data.empty:
-        st.subheader("Indexed Data:")
-        st.write(st.session_state.data)
+                st.error("Failed to crawl and index the website.")
 
 if __name__ == "__main__":
     main()
+    
